@@ -3,7 +3,8 @@
 ![binary_clock preview](assets/binary_clock.gif)
 
 A visual binary clock with a "hacker terminal" theme built using HTML, CSS, and JavaScript.
-100% made with Claude Design.
+
+Made with Claude Design.
 
 ## What it is 🚀
 

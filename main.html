@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>./binclock --tty</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=VT323&display=swap" rel="stylesheet">
+<style>
+  /* ---- Theme palettes (driven by body[data-theme]) ---- */
+  :root, body[data-theme="phosphor"] {
+    --bg:        #04080a;
+    --bg-2:      #061214;
+    --bit-bg:    #07120e;
+    --fg-rgb:    124, 255, 178;
+    --fg:        #7cffb2;
+    --fg-dim:    #2f6b4a;
+    --fg-ghost:  #0f2a1d;
+    --accent:    #b8ffd1;
+    --amber:     #ffb454;
+    --red:       #ff4d6d;
+    --grid:      rgba(124, 255, 178, 0.06);
+  }
+  body[data-theme="amber"] {
+    --bg:        #0a0500;
+    --bg-2:      #150c02;
+    --bit-bg:    #1a0f02;
+    --fg-rgb:    255, 180, 64;
+    --fg:        #ffb440;
+    --fg-dim:    #7a4d10;
+    --fg-ghost:  #2a1a04;
+    --accent:    #ffe0a8;
+    --amber:     #ffd47a;
+    --red:       #ff5a3c;
+    --grid:      rgba(255, 180, 64, 0.06);
+  }
+  body[data-theme="ice"] {
+    --bg:        #02080c;
+    --bg-2:      #04121a;
+    --bit-bg:    #061520;
+    --fg-rgb:    124, 220, 255;
+    --fg:        #7cdcff;
+    --fg-dim:    #2f5e7a;
+    --fg-ghost:  #0a2230;
+    --accent:    #cdf2ff;
+    --amber:     #ffc266;
+    --red:       #ff4d77;
+    --grid:      rgba(124, 220, 255, 0.06);
+  }
+  body[data-theme="blood"] {
+    --bg:        #0a0204;
+    --bg-2:      #170609;
+    --bit-bg:    #1a070b;
+    --fg-rgb:    255, 64, 96;
+    --fg:        #ff4060;
+    --fg-dim:    #6e1d2b;
+    --fg-ghost:  #2a070d;
+    --accent:    #ffb5c1;
+    --amber:     #ffb454;
+    --red:       #ff4d6d;
+    --grid:      rgba(255, 64, 96, 0.06);
+  }
+  body[data-theme="matrix"] {
+    --bg:        #020805;
+    --bg-2:      #04120a;
+    --bit-bg:    #051409;
+    --fg-rgb:    0, 255, 102;
+    --fg:        #00ff66;
+    --fg-dim:    #126b30;
+    --fg-ghost:  #062a14;
+    --accent:    #b4ffd1;
+    --amber:     #ffb454;
+    --red:       #ff4d6d;
+    --grid:      rgba(0, 255, 102, 0.06);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    min-height: 100%;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace;
+    font-feature-settings: "ss01", "cv11";
+    cursor: crosshair;
+    transition: background-color 240ms ease, color 240ms ease;
+  }
+  body { overflow-x: hidden; overflow-y: auto; }
+
+  /* --- Matrix rain background ------------------------------------- */
+  #matrix {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    opacity: 0.22;
+    pointer-events: none;
+  }
+
+  /* --- Scanlines + vignette + CRT bow ---------------------------- */
+  body::before {
+    content: "";
+    position: fixed; inset: 0; z-index: 5;
+    pointer-events: none;
+    background:
+      repeating-linear-gradient(
+        to bottom,
+        rgba(0,0,0,0) 0px,
+        rgba(0,0,0,0) 2px,
+        rgba(0,0,0,0.18) 3px,
+        rgba(0,0,0,0) 4px
+      );
+    mix-blend-mode: multiply;
+  }
+  body::after {
+    content: "";
+    position: fixed; inset: 0; z-index: 6;
+    pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.7) 100%);
+  }
+
+  /* Faint grid */
+  .grid {
+    position: fixed; inset: 0; z-index: 1;
+    background-image:
+      linear-gradient(var(--grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none;
+    mask-image: radial-gradient(ellipse at center, black 30%, transparent 80%);
+  }
+
+  /* --- Layout ----------------------------------------------------- */
+  .screen {
+    position: relative;
+    z-index: 10;
+    min-height: 100vh;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    padding: 20px 32px;
+    gap: 14px;
+  }
+
+  /* Top bar */
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--fg-dim);
+  }
+  .topbar .left { display: flex; gap: 22px; align-items: center; }
+  .topbar .right { display: flex; gap: 22px; align-items: center; }
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--fg); box-shadow: 0 0 8px var(--fg);
+    animation: blink 1.2s steps(2, end) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0.25; } }
+  .pill {
+    border: 1px solid var(--fg-dim);
+    padding: 4px 10px;
+    border-radius: 2px;
+    color: var(--fg);
+  }
+  .pill.warn { color: var(--amber); border-color: rgba(255,180,84,0.4); }
+
+  /* Theme swatches */
+  .themes {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+    padding: 3px 8px 3px 10px;
+    border: 1px solid var(--fg-dim);
+    border-radius: 2px;
+  }
+  .themes .lbl { font-size: 10px; color: var(--fg-dim); margin-right: 2px; }
+  .swatch {
+    width: 14px; height: 14px; border-radius: 2px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: var(--c);
+    box-shadow: 0 0 6px var(--c);
+    cursor: pointer;
+    padding: 0;
+    opacity: 0.55;
+    transition: opacity 160ms ease, transform 160ms ease;
+  }
+  .swatch:hover { opacity: 1; transform: scale(1.15); }
+  .swatch.active {
+    opacity: 1;
+    outline: 1px solid var(--c);
+    outline-offset: 2px;
+  }
+
+  /* HALT overlay */
+  body.halted .binclock .bit.on {
+    animation: haltblink 0.8s steps(2) infinite;
+  }
+  @keyframes haltblink {
+    50% { opacity: 0.35; box-shadow: none; }
+  }
+  body.halted .card .time { animation: haltblink 0.8s steps(2) infinite; }
+  .haltbanner {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) rotate(-3deg);
+    z-index: 20;
+    padding: 14px 28px;
+    border: 2px solid var(--red);
+    color: var(--red);
+    background: rgba(0,0,0,0.55);
+    font-family: 'VT323', monospace;
+    font-size: 48px;
+    letter-spacing: 0.3em;
+    text-shadow: 0 0 12px var(--red);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 160ms ease;
+  }
+  body.halted .haltbanner { opacity: 1; animation: haltblink 1s steps(2) infinite; }
+
+  /* Main content */
+  main {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto auto;
+    align-content: center;
+    justify-items: center;
+    gap: clamp(14px, 2.4vh, 28px);
+  }
+
+  /* The boot-style preamble */
+  .preamble {
+    font-size: 12px;
+    color: var(--fg-dim);
+    line-height: 1.55;
+    width: min(900px, 92vw);
+  }
+  /* Hide preamble lines on short viewports to keep readouts onscreen */
+  @media (max-height: 760px) {
+    .preamble div:nth-child(2),
+    .preamble div:nth-child(3),
+    .preamble div:nth-child(4) { display: none; }
+  }
+  @media (max-height: 560px) {
+    .preamble { display: none; }
+  }
+  .preamble .ok { color: var(--fg); }
+  .preamble .prompt::before { content: "$ "; color: var(--accent); }
+  .preamble .caret::after {
+    content: "▌";
+    margin-left: 4px;
+    color: var(--fg);
+    animation: caret 1s steps(2) infinite;
+  }
+  @keyframes caret { 50% { opacity: 0; } }
+
+  /* Shared clock sizing tokens (used by both grid + label row) */
+  main {
+    --cell: clamp(24px, min(3.6vw, 5.6vh), 52px);
+    --gap: clamp(7px, 1vw, 13px);
+    --label: clamp(10px, 0.9vw, 13px);
+  }
+
+  /* Binary clock */
+  .binclock {
+    display: grid;
+    grid-template-columns: repeat(8, var(--cell));
+    column-gap: var(--gap);
+    align-items: stretch;
+    justify-content: center;
+    padding: 44px 32px 22px;
+    border: 1px solid var(--fg-dim);
+    background:
+      linear-gradient(180deg, rgba(var(--fg-rgb),0.03), rgba(var(--fg-rgb),0) 60%),
+      var(--bg-2);
+    box-shadow:
+      0 0 0 1px rgba(var(--fg-rgb),0.04) inset,
+      0 0 40px rgba(var(--fg-rgb),0.05),
+      0 0 1px rgba(var(--fg-rgb),0.4);
+    position: relative;
+  }
+  .binclock::before {
+    content: "BCD :: H H : M M : S S";
+    position: absolute;
+    top: 14px; left: 16px;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    color: var(--fg-dim);
+  }
+  .binclock::after {
+    content: "0x" attr(data-hex);
+    position: absolute;
+    top: 14px; right: 16px;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    color: var(--fg-dim);
+  }
+
+  .col {
+    display: grid;
+    grid-template-rows: repeat(4, var(--cell));
+    row-gap: calc(var(--gap) * 0.8);
+    position: relative;
+  }
+  .col .weight {
+    position: absolute;
+    left: calc(var(--cell) + 8px);
+    font-size: var(--label);
+    color: var(--fg-ghost);
+    font-family: 'VT323', monospace;
+  }
+  /* place weights only on first column of each pair via JS? simpler: hide */
+  .col .weight { display: none; }
+
+  .bit {
+    width: var(--cell);
+    height: var(--cell);
+    border: 1px solid var(--fg-ghost);
+    border-radius: 2px;
+    display: grid;
+    place-items: center;
+    color: var(--fg-ghost);
+    font-family: 'VT323', monospace;
+    font-size: calc(var(--cell) * 0.55);
+    line-height: 1;
+    background:
+      radial-gradient(circle at 50% 40%, rgba(var(--fg-rgb),0.02), transparent 60%),
+      var(--bit-bg);
+    transition: all 120ms ease, background-color 240ms ease;
+    position: relative;
+  }
+  .bit.on {
+    color: var(--bg);
+    background:
+      radial-gradient(circle at 50% 35%, var(--accent), var(--fg) 60%, rgba(var(--fg-rgb),0.6) 100%);
+    border-color: var(--fg);
+    box-shadow:
+      0 0 8px rgba(var(--fg-rgb),0.55),
+      0 0 22px rgba(var(--fg-rgb),0.35),
+      0 0 1px rgba(var(--fg-rgb),1) inset;
+  }
+  .bit.off { /* keep default */ }
+  .bit.dead { opacity: 0.15; }   /* invalid BCD positions */
+
+  /* Numeric labels under columns */
+  .axislabels {
+    display: grid;
+    grid-template-columns: repeat(8, var(--cell));
+    column-gap: var(--gap);
+    margin-top: 4px;
+  }
+  .axislabels span {
+    text-align: center;
+    font-family: 'VT323', monospace;
+    font-size: calc(var(--cell) * 0.55);
+    color: var(--fg);
+    letter-spacing: 0.05em;
+  }
+  .axislabels .sep {
+    color: var(--fg-dim);
+  }
+
+  /* Clock + UTC readouts */
+  .readouts {
+    width: min(900px, 92vw);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  .card {
+    border: 1px solid var(--fg-dim);
+    background: linear-gradient(180deg, rgba(var(--fg-rgb),0.02), transparent 70%), var(--bg-2);
+    padding: 18px 22px 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .card .label {
+    font-size: 11px;
+    letter-spacing: 0.22em;
+    color: var(--fg-dim);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .card .label .tag {
+    color: var(--amber);
+    border: 1px solid rgba(255,180,84,0.4);
+    padding: 1px 6px;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+  }
+  .card .label .tag.alt {
+    color: var(--fg);
+    border-color: var(--fg-dim);
+  }
+  .card .time {
+    font-family: 'VT323', monospace;
+    font-size: clamp(36px, min(5.2vw, 8vh), 68px);
+    line-height: 1;
+    color: var(--fg);
+    text-shadow:
+      0 0 6px rgba(var(--fg-rgb),0.55),
+      0 0 16px rgba(var(--fg-rgb),0.25);
+    letter-spacing: 0.04em;
+  }
+  .card .sub {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--fg-dim);
+    letter-spacing: 0.08em;
+    display: flex;
+    justify-content: space-between;
+  }
+  .card .sub b { color: var(--fg); font-weight: 400; }
+
+  /* Bottom bar */
+  .botbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    color: var(--fg-dim);
+    text-transform: uppercase;
+  }
+  .botbar .keys span {
+    border: 1px solid var(--fg-ghost);
+    padding: 2px 7px;
+    margin-right: 6px;
+    color: var(--fg);
+  }
+
+  /* Glitch flicker on the whole screen, ultra-subtle */
+  @keyframes flicker {
+    0%, 95%, 100% { opacity: 1; }
+    96% { opacity: 0.85; }
+    97% { opacity: 1; }
+    98% { opacity: 0.92; }
+  }
+  .screen { animation: flicker 7s infinite; }
+
+  /* Responsive */
+  @media (max-width: 720px) {
+    .screen { padding: 18px; gap: 14px; }
+    .readouts { grid-template-columns: 1fr; }
+    .binclock { padding: 26px 18px 16px; }
+    .topbar .right .pill:nth-child(2) { display: none; }
+  }
+</style>
+</head>
+<body>
+  <canvas id="matrix"></canvas>
+  <div class="grid"></div>
+
+  <div class="screen">
+    <!-- Top bar -->
+    <header class="topbar">
+      <div class="left">
+        <span class="dot"></span>
+        <span>./binclock --tty0</span>
+        <span class="pill">SESSION <span id="session">#0000</span></span>
+      </div>
+      <div class="right">
+        <span class="themes" id="themes">
+          <span class="lbl">THEME</span>
+          <button class="swatch" data-theme="matrix"   style="--c:#00ff66" title="matrix"></button>
+          <button class="swatch" data-theme="amber"    style="--c:#ffb454" title="amber"></button>
+          <button class="swatch" data-theme="ice"      style="--c:#7cdcff" title="ice"></button>
+          <button class="swatch" data-theme="blood"    style="--c:#ff4060" title="blood"></button>
+          <button class="swatch" data-theme="phosphor" style="--c:#7cffb2" title="phosphor"></button>
+        </span>
+        <span class="pill" id="uptime">UPTIME 00:00:00</span>
+        <span class="pill warn" id="tz">TZ ???</span>
+        <span class="pill">CONN <b style="color:var(--fg)">SECURE</b></span>
+      </div>
+    </header>
+
+    <!-- Main -->
+    <main>
+      <div class="preamble">
+        <div><span class="prompt"></span>boot binclock.v1.3 --hacker</div>
+        <div>[<span class="ok">  OK  </span>] sincronizando oscilador de quartzo .........</div>
+        <div>[<span class="ok">  OK  </span>] montando /dev/clock0 em modo BCD ............</div>
+        <div>[<span class="ok">  OK  </span>] handshake com fuso do navegador ..............</div>
+        <div><span class="prompt"></span>watch -n 1 'date +%T && date -u +%T'<span class="caret"></span></div>
+      </div>
+
+      <!-- Binary clock grid -->
+      <div class="binclock" id="binclock" data-hex="00:00:00">
+        <!-- 8 columns: H1 H2 . M1 M2 . S1 S2 (separators rendered as empty/dead bits styling) -->
+      </div>
+      <div class="axislabels" id="axislabels">
+        <span id="lblH1">0</span>
+        <span id="lblH2">0</span>
+        <span class="sep">:</span>
+        <span id="lblM1">0</span>
+        <span id="lblM2">0</span>
+        <span class="sep">:</span>
+        <span id="lblS1">0</span>
+        <span id="lblS2">0</span>
+      </div>
+
+      <!-- Read-outs -->
+      <div class="readouts">
+        <div class="card">
+          <div class="label">
+            <span>LOCAL TIME // <span id="tzlong">—</span></span>
+            <span class="tag alt">BROWSER</span>
+          </div>
+          <div class="time" id="localTime">00:00:00</div>
+          <div class="sub">
+            <span>OFFSET <b id="offset">UTC±00:00</b></span>
+            <span><b id="localDate">0000-00-00</b></span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="label">
+            <span>UNIVERSAL TIME // ZULU</span>
+            <span class="tag">UTC</span>
+          </div>
+          <div class="time" id="utcTime">00:00:00</div>
+          <div class="sub">
+            <span>EPOCH <b id="epoch">0</b></span>
+            <span><b id="utcDate">0000-00-00</b></span>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Bottom bar -->
+    <footer class="botbar">
+      <div>[ binclock@anon:~ ] :: read-only :: no cookies set</div>
+      <div class="keys">
+        <span>ESC</span> halt/resume
+        &nbsp;&nbsp;
+        <span>SPACE</span> pulse
+      </div>
+    </footer>
+  </div>
+
+  <div class="haltbanner" id="haltbanner">// SIGSTOP // HALTED //</div>
+
+<script>
+/* ---------- Theme switching ---------- */
+const THEMES = ['matrix', 'amber', 'ice', 'blood', 'phosphor'];
+function applyTheme(name) {
+  if (!THEMES.includes(name)) name = 'matrix';
+  document.body.dataset.theme = name;
+  document.querySelectorAll('#themes .swatch').forEach(b => {
+    b.classList.toggle('active', b.dataset.theme === name);
+  });
+  try { localStorage.setItem('binclock.theme', name); } catch {}
+}
+document.querySelectorAll('#themes .swatch').forEach(b => {
+  b.addEventListener('click', () => applyTheme(b.dataset.theme));
+});
+let savedTheme = 'matrix';
+try { savedTheme = localStorage.getItem('binclock.theme') || 'matrix'; } catch {}
+applyTheme(savedTheme);
+
+function cssColor(name) {
+  return getComputedStyle(document.body).getPropertyValue(name).trim();
+}
+function fgRgbTriplet() {
+  return getComputedStyle(document.body).getPropertyValue('--fg-rgb').trim() || '124,255,178';
+}
+
+/* ---------- Matrix rain (lightweight) ---------- */
+(function matrix() {
+  const c = document.getElementById('matrix');
+  const ctx = c.getContext('2d');
+  let w, h, cols, drops, fontSize = 14;
+  const chars = '01アイウエオカキクケコサシスセソタチツテトナ$@#%&*<>/\\|=+-_.:';
+
+  function resize() {
+    w = c.width = window.innerWidth;
+    h = c.height = window.innerHeight;
+    cols = Math.floor(w / fontSize);
+    drops = new Array(cols).fill(0).map(() => Math.random() * -50);
+  }
+  resize();
+  window.addEventListener('resize', resize);
+
+  function draw() {
+    ctx.fillStyle = 'rgba(4, 8, 10, 0.08)';
+    ctx.fillRect(0, 0, w, h);
+    ctx.font = fontSize + 'px JetBrains Mono, monospace';
+    const rgb = fgRgbTriplet();
+    for (let i = 0; i < cols; i++) {
+      const ch = chars[Math.floor(Math.random() * chars.length)];
+      const x = i * fontSize;
+      const y = drops[i] * fontSize;
+      // head bright, tail dim
+      if (Math.random() > 0.975) {
+        ctx.fillStyle = `rgba(${rgb}, 1)`;
+      } else {
+        ctx.fillStyle = `rgba(${rgb}, 0.45)`;
+      }
+      ctx.fillText(ch, x, y);
+      if (y > h && Math.random() > 0.975) drops[i] = 0;
+      drops[i] += 1;
+    }
+  }
+  setInterval(draw, 60);
+})();
+
+/* ---------- Binary clock build ---------- */
+const binclockEl = document.getElementById('binclock');
+
+// 8 columns. Max digit value per column (so we know which bits are valid):
+// H1: 0-2 (2 bits used, top 2 dead)
+// H2: 0-9 (4 bits)
+// M1: 0-5 (3 bits used, top 1 dead)
+// M2: 0-9 (4 bits)
+// S1: 0-5 (3 bits used)
+// S2: 0-9 (4 bits)
+const colSpec = [
+  { id: 'H1', max: 2 },
+  { id: 'H2', max: 9 },
+  { id: 'M1', max: 5 },
+  { id: 'M2', max: 9 },
+  { id: 'S1', max: 5 },
+  { id: 'S2', max: 9 },
+];
+
+// We render 8 visible "columns" with two thin spacer columns? Instead, keep 6 BCD cols
+// plus separator columns. Easier: just 6 cols, and the axis label row has its own separators.
+// Let's rebuild grid as 6 columns to match cleaner.
+binclockEl.style.gridTemplateColumns = `repeat(6, var(--cell))`;
+
+document.getElementById('axislabels').style.gridTemplateColumns =
+  `repeat(6, var(--cell))`;
+// Remove ":" sep spans from DOM (we'll put separators visually between cards)
+const axis = document.getElementById('axislabels');
+[...axis.querySelectorAll('.sep')].forEach(n => n.remove());
+
+// Build columns
+const cols = [];
+colSpec.forEach((spec, idx) => {
+  const col = document.createElement('div');
+  col.className = 'col';
+  col.dataset.id = spec.id;
+  // 4 bits top->bottom = 8,4,2,1
+  const weights = [8, 4, 2, 1];
+  const bits = [];
+  weights.forEach((w, i) => {
+    const b = document.createElement('div');
+    b.className = 'bit';
+    b.dataset.weight = w;
+    // Mark unreachable bits as 'dead' (e.g. 8 in a 0-2 column)
+    if (w > spec.max) b.classList.add('dead');
+    bits.push(b);
+    col.appendChild(b);
+  });
+  binclockEl.appendChild(col);
+  cols.push({ ...spec, el: col, bits });
+});
+
+/* ---------- Clock tick ---------- */
+const fmt2 = n => String(n).padStart(2, '0');
+const fmt4 = n => String(n).padStart(4, '0');
+
+const sessionId = '#' + Math.floor(Math.random() * 0xFFFF).toString(16).toUpperCase().padStart(4, '0');
+document.getElementById('session').textContent = sessionId;
+
+const bootAt = Date.now();
+
+function offsetStr(d) {
+  const off = -d.getTimezoneOffset(); // minutes east of UTC
+  const sign = off >= 0 ? '+' : '-';
+  const a = Math.abs(off);
+  return `UTC${sign}${fmt2(Math.floor(a/60))}:${fmt2(a%60)}`;
+}
+
+function tzName() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || '—';
+  } catch { return '—'; }
+}
+
+const tzNameStr = tzName();
+document.getElementById('tz').innerHTML = 'TZ ' + tzNameStr.replace('_',' ').toUpperCase();
+document.getElementById('tzlong').textContent = tzNameStr;
+
+function setBits(col, digit) {
+  col.bits.forEach(b => {
+    const w = +b.dataset.weight;
+    if (b.classList.contains('dead')) return;
+    if (digit & w) {
+      b.classList.add('on');
+      b.classList.remove('off');
+    } else {
+      b.classList.remove('on');
+      b.classList.add('off');
+    }
+  });
+}
+
+function tick() {
+  const now = new Date();
+
+  // Local time
+  const h = now.getHours();
+  const m = now.getMinutes();
+  const s = now.getSeconds();
+  const digits = [
+    Math.floor(h/10), h%10,
+    Math.floor(m/10), m%10,
+    Math.floor(s/10), s%10,
+  ];
+  digits.forEach((d, i) => setBits(cols[i], d));
+
+  // Numeric labels under columns
+  document.getElementById('lblH1').textContent = digits[0];
+  document.getElementById('lblH2').textContent = digits[1];
+  document.getElementById('lblM1').textContent = digits[2];
+  document.getElementById('lblM2').textContent = digits[3];
+  document.getElementById('lblS1').textContent = digits[4];
+  document.getElementById('lblS2').textContent = digits[5];
+
+  // Hex stamp on binclock corner
+  const hex = `${fmt2(h)}:${fmt2(m)}:${fmt2(s)}`;
+  binclockEl.dataset.hex =
+    h.toString(16).toUpperCase().padStart(2,'0') + ':' +
+    m.toString(16).toUpperCase().padStart(2,'0') + ':' +
+    s.toString(16).toUpperCase().padStart(2,'0');
+
+  document.getElementById('localTime').textContent = hex;
+  document.getElementById('offset').textContent = offsetStr(now);
+  document.getElementById('localDate').textContent =
+    `${fmt4(now.getFullYear())}-${fmt2(now.getMonth()+1)}-${fmt2(now.getDate())}`;
+
+  // UTC
+  const uh = now.getUTCHours();
+  const um = now.getUTCMinutes();
+  const us = now.getUTCSeconds();
+  document.getElementById('utcTime').textContent = `${fmt2(uh)}:${fmt2(um)}:${fmt2(us)}`;
+  document.getElementById('utcDate').textContent =
+    `${fmt4(now.getUTCFullYear())}-${fmt2(now.getUTCMonth()+1)}-${fmt2(now.getUTCDate())}`;
+  document.getElementById('epoch').textContent = Math.floor(now.getTime()/1000);
+
+  // Uptime
+  const up = Math.floor((Date.now() - bootAt)/1000);
+  document.getElementById('uptime').textContent =
+    `UPTIME ${fmt2(Math.floor(up/3600))}:${fmt2(Math.floor(up/60)%60)}:${fmt2(up%60)}`;
+}
+tick();
+let tickTimer = setInterval(tick, 1000);
+let halted = false;
+
+function setHalted(v) {
+  halted = v;
+  document.body.classList.toggle('halted', v);
+  if (v) {
+    clearInterval(tickTimer);
+    tickTimer = null;
+  } else if (!tickTimer) {
+    tick();
+    tickTimer = setInterval(tick, 1000);
+  }
+}
+
+/* ---------- Keyboard ---------- */
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space') {
+    e.preventDefault();
+    const fg = cssColor('--fg') || '#7cffb2';
+    binclockEl.animate(
+      [
+        { filter: 'brightness(1)' },
+        { filter: `brightness(1.8) drop-shadow(0 0 18px ${fg})` },
+        { filter: 'brightness(1)' },
+      ],
+      { duration: 420, easing: 'ease-out' }
+    );
+  } else if (e.code === 'Escape') {
+    e.preventDefault();
+    setHalted(!halted);
+  }
+});
+</script>
+</body>
+</html>

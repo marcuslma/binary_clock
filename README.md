@@ -1,4 +1,4 @@
-# Binary Clock 💻
+# Binary Clock 🕓
 
 ![binary_clock preview](assets/binary_clock.gif)
 

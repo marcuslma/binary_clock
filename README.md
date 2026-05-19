@@ -18,7 +18,7 @@ It also includes:
 
 ## How to use ▶️
 
-Open the `main.html` file in a modern browser.
+Open the `index.html` file in a modern browser.
 
 ### Recommended ✅
 
@@ -32,8 +32,10 @@ python3 -m http.server 8000
 Then open in your browser:
 
 ```text
-http://localhost:8000/main.html
+http://localhost:8000/index.html
 ```
+
+The app loads icon and manifest assets from the `public/` folder, so keep that directory next to `index.html`.
 
 ## Keys ⌨️
 

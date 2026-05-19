@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,6 +7,14 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=VT323&display=swap" rel="stylesheet">
+<link rel="icon" type="image/x-icon" href="./public/favicon.ico">
+<link rel="icon" type="image/png" sizes="16x16" href="./public/favicon-16x16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="./public/favicon-32x32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="./public/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="./public/android-chrome-192x192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="./public/android-chrome-512x512.png">
+<link rel="manifest" href="./public/manifest.json">
+<meta name="theme-color" content="#ffffff">
 <style>
   /* ---- Theme palettes (driven by body[data-theme]) ---- */
   :root, body[data-theme="phosphor"] {
@@ -19,6 +27,8 @@
     --fg-ghost:  #0f2a1d;
     --accent:    #b8ffd1;
     --amber:     #ffb454;
+    --warn:      #ffb454;
+    --warn-rgb:  255, 180, 84;
     --red:       #ff4d6d;
     --grid:      rgba(124, 255, 178, 0.06);
   }
@@ -32,6 +42,9 @@
     --fg-ghost:  #2a1a04;
     --accent:    #ffe0a8;
     --amber:     #ffd47a;
+    /* On an amber theme, amber tags vanish — use a cool cyan contrast */
+    --warn:      #7cdcff;
+    --warn-rgb:  124, 220, 255;
     --red:       #ff5a3c;
     --grid:      rgba(255, 180, 64, 0.06);
   }
@@ -45,6 +58,8 @@
     --fg-ghost:  #0a2230;
     --accent:    #cdf2ff;
     --amber:     #ffc266;
+    --warn:      #ffc266;
+    --warn-rgb:  255, 194, 102;
     --red:       #ff4d77;
     --grid:      rgba(124, 220, 255, 0.06);
   }
@@ -58,6 +73,9 @@
     --fg-ghost:  #2a070d;
     --accent:    #ffb5c1;
     --amber:     #ffb454;
+    /* Red theme — amber sits too close to red. Use a sharp yellow */
+    --warn:      #f5e663;
+    --warn-rgb:  245, 230, 99;
     --red:       #ff4d6d;
     --grid:      rgba(255, 64, 96, 0.06);
   }
@@ -71,6 +89,8 @@
     --fg-ghost:  #062a14;
     --accent:    #b4ffd1;
     --amber:     #ffb454;
+    --warn:      #ffb454;
+    --warn-rgb:  255, 180, 84;
     --red:       #ff4d6d;
     --grid:      rgba(0, 255, 102, 0.06);
   }
@@ -136,10 +156,12 @@
     z-index: 10;
     min-height: 100vh;
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto 1fr auto;
     padding: 20px 32px;
     gap: 14px;
   }
+  .screen > * { min-width: 0; }
 
   /* Top bar */
   .topbar {
@@ -165,18 +187,18 @@
     border-radius: 2px;
     color: var(--fg);
   }
-  .pill.warn { color: var(--amber); border-color: rgba(255,180,84,0.4); }
+  .pill.warn { color: var(--warn); border-color: rgba(var(--warn-rgb), 0.45); }
 
-  /* Theme swatches */
+  /* Theme swatches — sized to match .pill exactly */
   .themes {
     display: inline-flex;
     gap: 6px;
     align-items: center;
-    padding: 3px 8px 3px 10px;
+    padding: 4px 10px;
     border: 1px solid var(--fg-dim);
     border-radius: 2px;
   }
-  .themes .lbl { font-size: 10px; color: var(--fg-dim); margin-right: 2px; }
+  .themes .lbl { font-size: 12px; color: var(--fg-dim); margin-right: 2px; letter-spacing: 0.12em; }
   .swatch {
     width: 14px; height: 14px; border-radius: 2px;
     border: 1px solid rgba(255,255,255,0.08);
@@ -237,6 +259,12 @@
     color: var(--fg-dim);
     line-height: 1.55;
     width: min(900px, 92vw);
+  }
+  /* Boot-line ellipsis padding: desktop default = long, mobile = shorter */
+  .preamble .dots-m { display: none; }
+  @media (max-width: 425px) {
+    .preamble .dots-d { display: none; }
+    .preamble .dots-m { display: inline; }
   }
   /* Hide preamble lines on short viewports to keep readouts onscreen */
   @media (max-height: 760px) {
@@ -387,8 +415,8 @@
     margin-bottom: 8px;
   }
   .card .label .tag {
-    color: var(--amber);
-    border: 1px solid rgba(255,180,84,0.4);
+    color: var(--warn);
+    border: 1px solid rgba(var(--warn-rgb), 0.45);
     padding: 1px 6px;
     font-size: 10px;
     letter-spacing: 0.15em;
@@ -422,16 +450,72 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 12px;
     font-size: 11px;
     letter-spacing: 0.15em;
     color: var(--fg-dim);
     text-transform: uppercase;
   }
-  .botbar .keys span {
+  .botbar .creds { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .botbar .keys {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  /* Clickable key buttons (work as touch targets on mobile too) */
+  .keybtn {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-2);
+    border: 1px solid var(--fg-dim);
+    border-radius: 2px;
+    padding: 7px 12px;
+    color: var(--fg-dim);
+    font-family: inherit;
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 140ms ease;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .keybtn .kcap {
+    display: inline-grid;
+    place-items: center;
+    min-width: 26px;
+    padding: 2px 6px;
     border: 1px solid var(--fg-ghost);
-    padding: 2px 7px;
-    margin-right: 6px;
+    border-radius: 2px;
+    background: rgba(var(--fg-rgb), 0.04);
     color: var(--fg);
+    font-family: 'VT323', monospace;
+    font-size: 14px;
+    letter-spacing: 0.05em;
+    box-shadow: 0 2px 0 rgba(var(--fg-rgb),0.18), inset 0 -1px 0 rgba(0,0,0,0.3);
+  }
+  .keybtn:hover, .keybtn:focus-visible {
+    color: var(--fg);
+    border-color: var(--fg);
+    box-shadow: 0 0 12px rgba(var(--fg-rgb), 0.25);
+    outline: none;
+  }
+  .keybtn:active .kcap {
+    transform: translateY(1px);
+    box-shadow: inset 0 -1px 0 rgba(0,0,0,0.3);
+  }
+  .keybtn[aria-pressed="true"] {
+    color: var(--red);
+    border-color: var(--red);
+    background: rgba(255, 77, 109, 0.08);
+  }
+  .keybtn[aria-pressed="true"] .kcap {
+    color: var(--red);
+    border-color: rgba(255, 77, 109, 0.5);
+    background: rgba(255, 77, 109, 0.12);
   }
 
   /* Glitch flicker on the whole screen, ultra-subtle */
@@ -443,12 +527,69 @@
   }
   .screen { animation: flicker 7s infinite; }
 
-  /* Responsive */
-  @media (max-width: 720px) {
-    .screen { padding: 18px; gap: 14px; }
-    .readouts { grid-template-columns: 1fr; }
-    .binclock { padding: 26px 18px 16px; }
-    .topbar .right .pill:nth-child(2) { display: none; }
+  /* Mid-width: drop SESSION pill before THEME selector collides with it */
+  @media (max-width: 1100px) {
+    .topbar .left .pill { display: none; }
+  }
+
+  /* ============ Responsive: mobile-first refinement ============ */
+  @media (max-width: 880px) {
+    .screen { padding: 14px 14px 12px; gap: 10px; }
+
+    /* Mobile sizing tokens — bigger cells so BCD reads well on small screens */
+    main { --cell: clamp(34px, 11.5vw, 52px); --gap: 9px; }
+
+    /* Compact topbar: keep just identity + theme + uptime; stack on two rows if needed */
+    .topbar { flex-wrap: wrap; gap: 10px; row-gap: 10px; font-size: 11px; letter-spacing: 0.08em; min-width: 0; }
+    .topbar .left { gap: 10px; min-width: 0; flex-shrink: 1; }
+    .topbar .left > span:not(.dot) { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; font-size: 10px; }
+    .topbar .left .pill { display: none; }
+    .topbar .right { gap: 8px; flex-wrap: wrap; justify-content: flex-end; flex: 0 1 auto; min-width: 0; }
+    .topbar .right .pill { display: none; }
+    .topbar .right #uptime { display: inline-block; font-size: 10px; padding: 3px 7px; }
+
+    /* Theme selector — match the smaller mobile pill height */
+    .themes { padding: 3px 8px; gap: 6px; }
+    .themes .lbl { font-size: 10px; }
+    .swatch { width: 12px; height: 12px; }
+
+    /* Readouts stack */
+    .readouts { grid-template-columns: 1fr; gap: 10px; width: 100%; }
+    .card { padding: 12px 14px 14px; }
+    .card .time { font-size: clamp(40px, 12vw, 56px); }
+    .card .label { font-size: 10px; letter-spacing: 0.16em; }
+    .card .label .tag { font-size: 9px; }
+    .card .sub { font-size: 10px; letter-spacing: 0.05em; }
+
+    /* Binary clock card — drop corner labels (would overlap on small width) */
+    .binclock { padding: 18px 14px 14px; }
+    .binclock::before, .binclock::after { display: none; }
+
+    /* Bottom bar: stack so ESC/SPACE buttons get full row, easy to tap */
+    .botbar { flex-direction: column-reverse; align-items: stretch; gap: 8px; }
+    .botbar .keys { justify-content: space-between; }
+    .keybtn { flex: 1; justify-content: center; padding: 11px 12px; font-size: 11px; }
+    .keybtn .kcap { font-size: 16px; min-width: 32px; }
+    .botbar .creds { text-align: center; font-size: 9px; letter-spacing: 0.12em; opacity: 0.7; }
+
+    /* HALT banner: shrink to fit on phones */
+    .haltbanner { font-size: 28px; padding: 10px 18px; letter-spacing: 0.2em; }
+
+    /* Less aggressive vignette on mobile (saves contrast) */
+    body::after { background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.55) 100%); }
+  }
+
+  /* Very narrow phones */
+  @media (max-width: 380px) {
+    main { --cell: clamp(30px, 12vw, 44px); --gap: 7px; }
+    .topbar .right #uptime { display: none; }
+    .card .time { font-size: clamp(34px, 11vw, 48px); }
+  }
+
+  /* Disable cursor crosshair / hover effects on touch devices */
+  @media (hover: none) {
+    html, body { cursor: default; }
+    .swatch:hover { transform: none; }
   }
 </style>
 </head>
@@ -483,9 +624,9 @@
     <main>
       <div class="preamble">
         <div><span class="prompt"></span>boot binclock.v1.3 --hacker</div>
-        <div>[<span class="ok">  OK  </span>] sincronizando oscilador de quartzo .........</div>
-        <div>[<span class="ok">  OK  </span>] montando /dev/clock0 em modo BCD ............</div>
-        <div>[<span class="ok">  OK  </span>] handshake com fuso do navegador ..............</div>
+        <div>[<span class="ok">  OK  </span>] sincronizando oscilador de quartzo <span class="dots dots-d">.........</span><span class="dots dots-m">.....</span></div>
+        <div>[<span class="ok">  OK  </span>] montando /dev/clock0 em modo BCD <span class="dots dots-d">...........</span><span class="dots dots-m">.......</span></div>
+        <div>[<span class="ok">  OK  </span>] handshake com fuso do navegador <span class="dots dots-d">............</span><span class="dots dots-m">........</span></div>
         <div><span class="prompt"></span>watch -n 1 'date +%T && date -u +%T'<span class="caret"></span></div>
       </div>
 
@@ -533,11 +674,14 @@
 
     <!-- Bottom bar -->
     <footer class="botbar">
-      <div>[ binclock@anon:~ ] :: read-only :: no cookies set</div>
-      <div class="keys">
-        <span>ESC</span> halt/resume
-        &nbsp;&nbsp;
-        <span>SPACE</span> pulse
+      <div class="creds">[ binclock@anon:~ ] :: read-only :: <span class="hide-narrow">no cookies set ::</span> press <b style="color:var(--fg)">D</b> to cycle theme</div>
+      <div class="keys" id="keys">
+        <button type="button" class="keybtn" id="btnHalt" aria-pressed="false" aria-label="Halt or resume the clock">
+          <span class="kcap">ESC</span><span>halt/resume</span>
+        </button>
+        <button type="button" class="keybtn" id="btnPulse" aria-label="Pulse the binary clock">
+          <span class="kcap">␣</span><span>pulse</span>
+        </button>
       </div>
     </footer>
   </div>
@@ -764,24 +908,50 @@ function setHalted(v) {
   }
 }
 
+/* ---------- Action handlers (shared by keyboard + buttons) ---------- */
+function doPulse() {
+  const fg = cssColor('--fg') || '#7cffb2';
+  binclockEl.animate(
+    [
+      { filter: 'brightness(1)' },
+      { filter: `brightness(1.8) drop-shadow(0 0 18px ${fg})` },
+      { filter: 'brightness(1)' },
+    ],
+    { duration: 420, easing: 'ease-out' }
+  );
+}
+function doToggleHalt() {
+  setHalted(!halted);
+  const btn = document.getElementById('btnHalt');
+  if (btn) btn.setAttribute('aria-pressed', String(halted));
+}
+function doCycleTheme(dir) {
+  const current = document.body.dataset.theme || 'matrix';
+  const idx = THEMES.indexOf(current);
+  const next = THEMES[(idx + (dir || 1) + THEMES.length) % THEMES.length];
+  applyTheme(next);
+}
+
 /* ---------- Keyboard ---------- */
 document.addEventListener('keydown', (e) => {
+  // Ignore typing in inputs (none today, but safe)
+  if (e.target && /^(input|textarea|select)$/i.test(e.target.tagName)) return;
+
   if (e.code === 'Space') {
     e.preventDefault();
-    const fg = cssColor('--fg') || '#7cffb2';
-    binclockEl.animate(
-      [
-        { filter: 'brightness(1)' },
-        { filter: `brightness(1.8) drop-shadow(0 0 18px ${fg})` },
-        { filter: 'brightness(1)' },
-      ],
-      { duration: 420, easing: 'ease-out' }
-    );
+    doPulse();
   } else if (e.code === 'Escape') {
     e.preventDefault();
-    setHalted(!halted);
+    doToggleHalt();
+  } else if (e.key === 'd' || e.key === 'D') {
+    e.preventDefault();
+    doCycleTheme(e.shiftKey ? -1 : 1);
   }
 });
+
+/* ---------- Tappable buttons ---------- */
+document.getElementById('btnHalt').addEventListener('click', doToggleHalt);
+document.getElementById('btnPulse').addEventListener('click', doPulse);
 </script>
 </body>
 </html>

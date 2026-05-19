@@ -51,7 +51,7 @@ The app loads icon and manifest assets from the `public/` folder, so keep that d
 
 ## Themes 🎨
 
-`main.html` offers five themes:
+`index.html` offers five themes:
 - phosphor
 - amber
 - ice

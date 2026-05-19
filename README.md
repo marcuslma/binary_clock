@@ -26,7 +26,7 @@ Run the local Python server from the project directory:
 
 ```bash
 cd /home/marcus/Development/marcus/binary_clock
-python3 local_server.py
+python3 app.py
 ```
 
 Then open in your browser if it does not open automatically:

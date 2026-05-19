@@ -20,13 +20,13 @@ It also includes:
 
 Open the `index.html` file in a modern browser.
 
-### Recommended ✅
+### Local development ✅
 
-Run the project with Python from the project directory:
+Run the local Python server from the project directory:
 
 ```bash
 cd /home/marcus/Development/marcus/binary_clock
-python3 app.py
+python3 local_server.py
 ```
 
 Then open in your browser if it does not open automatically:
@@ -34,6 +34,13 @@ Then open in your browser if it does not open automatically:
 ```text
 http://localhost:8000/index.html
 ```
+
+### Deploy on Vercel 🚀
+
+This repository is configured as a static site for Vercel.
+The deployment serves `index.html` directly, so no serverless function is required.
+
+### Assets
 
 The app loads icon and manifest assets from the `public/` folder, so keep that directory next to `index.html`.
 

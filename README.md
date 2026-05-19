@@ -22,14 +22,14 @@ Open the `index.html` file in a modern browser.
 
 ### Recommended ✅
 
-To avoid local file restrictions, run a simple HTTP server from the project directory:
+Run the project with Python from the project directory:
 
 ```bash
 cd /home/marcus/Development/marcus/binary_clock
-python3 -m http.server 8000
+python3 app.py
 ```
 
-Then open in your browser:
+Then open in your browser if it does not open automatically:
 
 ```text
 http://localhost:8000/index.html
